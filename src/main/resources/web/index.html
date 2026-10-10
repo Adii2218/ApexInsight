@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>ApexInsight · People, performance, progress</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <main id="login-screen" class="login-layout" hidden>
+    <section class="login-brand" aria-label="About ApexInsight">
+      <div class="brand-mark">A</div>
+      <p class="eyebrow">PEOPLE · PERFORMANCE · PROGRESS</p>
+      <h1>Better work starts with better conversations.</h1>
+      <p>Thoughtful feedback, clear expectations, and meaningful progress in one calm workspace.</p>
+    </section>
+    <section class="login-card">
+      <p class="eyebrow">YOUR WORKSPACE</p>
+      <h2>Welcome back</h2>
+      <p class="muted">Sign in with one of the sample team accounts.</p>
+      <form id="login-form">
+        <label for="login-username">Username</label>
+        <input id="login-username" name="username" autocomplete="username" required>
+        <label for="login-password">Password</label>
+        <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+        <button class="button primary full" type="submit">Sign in</button>
+      </form>
+      <p id="login-message" class="notice" role="status" aria-live="polite"></p>
+      <div class="demo-accounts">
+        <h3>Try a demo account</h3>
+        <button class="account-choice" type="button" data-user="manager" data-pass="manager123"><span>Jordan Lee</span><small>Manager · manager123</small></button>
+        <button class="account-choice" type="button" data-user="aryan" data-pass="aryan123"><span>Aryan</span><small>Product Manager · aryan123</small></button>
+        <button class="account-choice" type="button" data-user="shikha" data-pass="shikha123"><span>Shikha</span><small>Software Engineer · shikha123</small></button>
+        <button class="account-choice" type="button" data-user="tanvi" data-pass="tanvi123"><span>Tanvi</span><small>UX Designer · tanvi123</small></button>
+      </div>
+    </section>
+  </main>
+
+  <div id="app" hidden>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="ApexInsight home"><span class="brand-mark small">A</span><span>ApexInsight</span></a>
+      <nav id="navigation" class="navigation" aria-label="Main navigation"></nav>
+      <div class="user-menu"><span id="current-user" class="user-name"></span><button id="change-password" class="button ghost" type="button">Password</button><button id="logout" class="button ghost" type="button">Sign out</button></div>
+    </header>
+    <main class="workspace">
+      <div class="page-heading">
+        <div><p class="eyebrow">YOUR WORKSPACE</p><h1 id="page-title">Overview</h1><p id="page-subtitle" class="muted"></p></div>
+        <button id="refresh" class="button secondary" type="button">Refresh</button>
+      </div>
+      <p id="app-message" class="notice" role="status" aria-live="polite"></p>
+      <section id="view" aria-live="polite"></section>
+    </main>
+    <footer class="footer">ApexInsight · Private employee data. Sign out when you are done.</footer>
+  </div>
+
+  <dialog id="password-dialog">
+    <form id="password-form" method="dialog">
+      <h2>Change your password</h2>
+      <label for="current-password">Current password</label>
+      <input id="current-password" type="password" autocomplete="current-password" required>
+      <label for="new-password">New password <span class="muted">(8–128 characters)</span></label>
+      <input id="new-password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+      <label for="confirm-password">Confirm new password</label>
+      <input id="confirm-password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+      <div class="form-actions"><button id="cancel-password" class="button secondary" type="button">Cancel</button><button class="button primary" type="submit">Update password</button></div>
+    </form>
+  </dialog>
+</body>
+</html>
