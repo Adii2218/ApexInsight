@@ -152,6 +152,9 @@ public final class WebPortalServer implements AutoCloseable {
                 } else if ("/goals".equals(path)) {
                     sendJson(response, 200, Searchable.matching(service.getGoals(user),
                             request.getParameter("search")).stream().map(ApiServlet::goalJson).toList());
+                } else if ("/insights".equals(path)) {
+                    requireManager(user);
+                    sendJson(response, 200, service.getManagerInsights(user));
                 } else {
                     sendJson(response, 404, error("Endpoint not found."));
                 }

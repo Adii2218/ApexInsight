@@ -4,6 +4,7 @@ import com.apexinsight.model.Employee;
 import com.apexinsight.model.Evaluation;
 import com.apexinsight.model.Goal;
 import com.apexinsight.model.Manager;
+import com.apexinsight.model.ManagerInsights;
 import com.apexinsight.model.ProgressTrackable;
 import com.apexinsight.model.User;
 import com.apexinsight.service.AppException;
@@ -260,7 +261,7 @@ public final class DashboardFrame extends JFrame {
     }
 
     private final class OverviewPanel extends ContentPanel {
-        private final JPanel metrics = new JPanel(new java.awt.GridLayout(1, 3, 14, 0));
+        private final JPanel metrics = new JPanel(new java.awt.GridLayout(0, 3, 14, 10));
         private final DefaultTableModel model = model("Date", "Activity", "Details");
         private final JTable recent = new JTable(model);
 
@@ -296,11 +297,14 @@ public final class DashboardFrame extends JFrame {
                         ? service.getAllEvaluations(user) : service.getEvaluations(user, user.getId());
                 List<Goal> goals = service.getGoals(user);
                 List<Employee> employees = user instanceof Manager ? service.getEmployees(user) : List.of();
-                return new Object[]{reviews, goals, employees};
+                ManagerInsights insights = user instanceof Manager
+                        ? service.getManagerInsights(user, reviews, goals) : null;
+                return new Object[]{reviews, goals, employees, insights};
             }, result -> {
                 @SuppressWarnings("unchecked") List<Evaluation> reviews = (List<Evaluation>) result[0];
                 @SuppressWarnings("unchecked") List<Goal> goals = (List<Goal>) result[1];
                 @SuppressWarnings("unchecked") List<Employee> employees = (List<Employee>) result[2];
+                ManagerInsights insights = (ManagerInsights) result[3];
                 double average = reviews.stream().mapToInt(Evaluation::rating).average().orElse(0);
                 long inProgress = goals.stream().filter(goal -> goal.progress() < 100).count();
                 int goalProgress = (int) Math.round(goals.stream()
@@ -308,7 +312,11 @@ public final class DashboardFrame extends JFrame {
                 if (user instanceof Manager) {
                     showMetrics(new String[]{"Team members", "Performance reviews", "Active goals"},
                             new String[]{String.valueOf(employees.size()), String.valueOf(reviews.size()),
-                                    inProgress + " · " + goalProgress + "% avg"});
+                                    inProgress + " · " + goalProgress + "% avg"},
+                            new String[]{"Rating · latest 30 days", "Rating · prior 30 days", "At-risk / overdue goals"},
+                            new String[]{ratingMetric(insights.recentAverageRating(), insights.recentReviewCount()),
+                                    ratingMetric(insights.previousAverageRating(), insights.previousReviewCount()),
+                                    String.valueOf(insights.atRiskOrOverdueGoalCount())});
                 } else {
                     showMetrics(new String[]{"Average review", "Reviews received", "Goals completed"},
                             new String[]{reviews.isEmpty() ? "—" : String.format(java.util.Locale.ROOT, "%.1f / 5", average),
@@ -333,17 +341,19 @@ public final class DashboardFrame extends JFrame {
             });
         }
 
-        private void showMetrics(String[] titles, String[] values) {
+        private void showMetrics(String[] titles, String[] values, String[] insightTitles, String[] insightValues) {
             metrics.removeAll();
-            for (int i = 0; i < titles.length; i++) {
+            for (int i = 0; i < titles.length + insightTitles.length; i++) {
                 JPanel metric = new JPanel(new BorderLayout(0, 7));
                 metric.setBackground(UiStyle.LIGHT);
                 metric.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(UiStyle.BORDER),
                         BorderFactory.createEmptyBorder(15, 17, 15, 17)));
-                JLabel caption = new JLabel(titles[i]);
+                boolean insight = i >= titles.length;
+                int index = insight ? i - titles.length : i;
+                JLabel caption = new JLabel(insight ? insightTitles[index] : titles[index]);
                 caption.setForeground(UiStyle.MUTED);
                 caption.setFont(caption.getFont().deriveFont(Font.BOLD, 12f));
-                JLabel value = new JLabel(values[i]);
+                JLabel value = new JLabel(insight ? insightValues[index] : values[index]);
                 value.setForeground(UiStyle.NAVY);
                 value.setFont(value.getFont().deriveFont(Font.BOLD, 25f));
                 metric.add(caption, BorderLayout.NORTH);
@@ -352,6 +362,15 @@ public final class DashboardFrame extends JFrame {
             }
             metrics.revalidate();
             metrics.repaint();
+        }
+
+        private void showMetrics(String[] titles, String[] values) {
+            showMetrics(titles, values, new String[0], new String[0]);
+        }
+
+        private String ratingMetric(Double average, int count) {
+            return average == null ? "— · no reviews"
+                    : String.format(java.util.Locale.ROOT, "%.1f / 5 · %d reviews", average, count);
         }
     }
 
