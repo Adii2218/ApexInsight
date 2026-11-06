@@ -5,13 +5,18 @@ import com.apexinsight.model.Employee;
 import com.apexinsight.model.Evaluation;
 import com.apexinsight.model.Goal;
 import com.apexinsight.model.Manager;
+import com.apexinsight.model.ManagerInsights;
 import com.apexinsight.model.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -20,6 +25,7 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ApexInsightServiceTest {
@@ -30,12 +36,15 @@ class ApexInsightServiceTest {
     private Manager manager;
     private Employee alex;
     private Employee sam;
+    private Database database;
+    private Clock clock;
 
     @BeforeEach
     void setUp() throws Exception {
-        Database database = new Database(temporaryDirectory.resolve("test.db"));
+        database = new Database(temporaryDirectory.resolve("test.db"));
         database.initialize();
-        service = new ApexInsightService(database);
+        clock = Clock.fixed(Instant.now(), ZoneId.systemDefault());
+        service = new ApexInsightService(database, clock);
         manager = assertInstanceOf(Manager.class, service.login("manager", "manager123".toCharArray()));
         List<Employee> employees = service.getEmployees(manager);
         alex = employees.stream().filter(employee -> employee.getUsername().equals("aryan")).findFirst().orElseThrow();
@@ -130,6 +139,60 @@ class ApexInsightServiceTest {
         assertThrows(AppException.class, () -> service.getEmployees(aryan));
         assertThrows(AppException.class, () -> service.resetEmployeePassword(manager,
                 manager.getId(), "anotherpass".toCharArray()));
+    }
+
+    @Test
+    void summarizesReviewWindowsAndAtRiskOrOverdueGoalsForManagers() throws Exception {
+        LocalDate today = LocalDate.now(clock);
+        service.addEvaluation(manager, alex.getId(), 5, "Recent review at the lower boundary.");
+        service.addEvaluation(manager, alex.getId(), 3, "Recent review today.");
+        service.addEvaluation(manager, alex.getId(), 4, "Previous review at the upper boundary.");
+        service.addEvaluation(manager, alex.getId(), 2, "Previous review at the lower boundary.");
+        service.addEvaluation(manager, alex.getId(), 1, "Review outside both windows.");
+        service.addEvaluation(manager, alex.getId(), 2, "Future-dated review.");
+        setReviewDate("Recent review at the lower boundary.", today.minusDays(29));
+        setReviewDate("Recent review today.", today);
+        setReviewDate("Previous review at the upper boundary.", today.minusDays(30));
+        setReviewDate("Previous review at the lower boundary.", today.minusDays(59));
+        setReviewDate("Review outside both windows.", today.minusDays(60));
+        setReviewDate("Future-dated review.", today.plusDays(1));
+
+        service.saveGoal(manager, 0, alex.getId(), "Flagged goal", "Explicitly at risk.",
+                today.plusDays(2), "At risk", 30);
+        service.saveGoal(manager, 0, alex.getId(), "Overdue goal", "Past due and incomplete.",
+                today.minusDays(1), "In progress", 50);
+        service.saveGoal(manager, 0, alex.getId(), "Completed goal", "Past due but complete.",
+                today.minusDays(2), "Completed", 100);
+        service.saveGoal(manager, 0, alex.getId(), "Future goal", "Not yet due.",
+                today.plusDays(1), "In progress", 10);
+
+        ManagerInsights insights = service.getManagerInsights(manager);
+        assertEquals(2, insights.recentReviewCount());
+        assertEquals(4.0, insights.recentAverageRating(), 0.001);
+        assertEquals(2, insights.previousReviewCount());
+        assertEquals(3.0, insights.previousAverageRating(), 0.001);
+        assertEquals(2, insights.atRiskOrOverdueGoalCount());
+        assertThrows(AppException.class, () -> service.getManagerInsights(alex));
+    }
+
+    @Test
+    void managerInsightsRepresentEmptyReviewWindowsWithoutInventingAnAverage() throws Exception {
+        ManagerInsights insights = service.getManagerInsights(manager);
+        assertEquals(0, insights.recentReviewCount());
+        assertEquals(0, insights.previousReviewCount());
+        assertNull(insights.recentAverageRating());
+        assertNull(insights.previousAverageRating());
+        assertEquals(0, insights.atRiskOrOverdueGoalCount());
+    }
+
+    private void setReviewDate(String feedback, LocalDate date) throws Exception {
+        try (var connection = database.connect();
+             var statement = connection.prepareStatement(
+                     "UPDATE evaluations SET created_at = ? WHERE feedback = ?")) {
+            statement.setString(1, LocalDateTime.of(date, java.time.LocalTime.NOON).toString());
+            statement.setString(2, feedback);
+            assertEquals(1, statement.executeUpdate());
+        }
     }
 
     @Test

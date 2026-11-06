@@ -97,16 +97,22 @@ function metric(label, value) {
 }
 
 async function drawOverview() {
-  const [reviews, goals] = await Promise.all([
-    api(state.user.role === "MANAGER" ? "/api/reviews" : "/api/reviews"),
-    api("/api/goals")
+  const [reviews, goals, insights] = await Promise.all([
+    api("/api/reviews"),
+    api("/api/goals"),
+    state.user.role === "MANAGER" ? api("/api/insights") : Promise.resolve(null)
   ]);
   state.reviews = reviews;
   state.goals = goals;
   const average = reviews.length ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1) : "—";
   const outstanding = goals.filter(goal => goal.progress < 100).length;
   const cards = state.user.role === "MANAGER"
-    ? [["Team members", state.employees.length], ["Reviews written", reviews.length], ["Goals in progress", outstanding]]
+    ? [["Team members", state.employees.length], ["Reviews written", reviews.length], ["Goals in progress", outstanding],
+      [`Rating · latest 30 days · ${insights.recentReviewCount} reviews`,
+        insights.recentAverageRating === null ? "—" : `${insights.recentAverageRating.toFixed(1)} / 5`],
+      [`Rating · prior 30 days · ${insights.previousReviewCount} reviews`,
+        insights.previousAverageRating === null ? "—" : `${insights.previousAverageRating.toFixed(1)} / 5`],
+      ["At-risk / overdue goals", insights.atRiskOrOverdueGoalCount]]
     : [["Average rating", reviews.length ? `${average} / 5` : "—"], ["Reviews received", reviews.length],
       ["Goals completed", `${goals.filter(goal => goal.progress === 100).length} of ${goals.length}`]];
   const metrics = el("section", "", "metric-grid");
@@ -287,17 +293,21 @@ async function drawGoals() {
     editor.append(el("h2", "Assign or update a goal"), el("p", "Set a measurable outcome and a realistic due date.", "panel-description"));
     const form = el("form");
     form.id = "goal-form";
+    const dueDateField = textField("Due date", "goal-due",
+      new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
+    dueDateField.querySelector("input").type = "date";
+    const progressField = textField("Progress (%)", "goal-progress", "0");
+    const progressInput = progressField.querySelector("input");
+    progressInput.type = "number";
+    progressInput.min = "0";
+    progressInput.max = "100";
     form.append(
       selectField("Employee", state.employees.map(person => [person.id, `${person.fullName} · ${person.jobTitle}`]), "goal-employee"),
       textField("Goal title", "goal-title"),
       textField("What does success look like?", "goal-description", "", true),
-      textField("Due date", "goal-due", new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10)),
+      dueDateField,
       selectField("Status", STATUS_OPTIONS.map(status => [status, status]), "goal-status"),
-      textField("Progress (%)", "goal-progress", "0"));
-    byId("goal-due").type = "date";
-    byId("goal-progress").type = "number";
-    byId("goal-progress").min = "0";
-    byId("goal-progress").max = "100";
+      progressField);
     const footer = el("div", "", "form-actions");
     footer.append(button("New goal", "secondary", () => {
       state.selectedGoal = 0;

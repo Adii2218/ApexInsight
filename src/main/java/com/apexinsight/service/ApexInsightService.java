@@ -8,14 +8,18 @@ import com.apexinsight.model.Employee;
 import com.apexinsight.model.Evaluation;
 import com.apexinsight.model.Goal;
 import com.apexinsight.model.Manager;
+import com.apexinsight.model.ManagerInsights;
 import com.apexinsight.model.User;
 
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 public final class ApexInsightService {
     private static final List<String> GOAL_STATUSES = List.of("Not started", "In progress", "At risk", "Completed");
+    private final Clock clock;
     private final UserDao users;
     private final EvaluationDao evaluations;
     private final GoalDao goals;
@@ -25,6 +29,11 @@ public final class ApexInsightService {
     }
 
     public ApexInsightService(Database database) {
+        this(database, Clock.systemDefaultZone());
+    }
+
+    ApexInsightService(Database database, Clock clock) {
+        this.clock = Objects.requireNonNull(clock);
         users = new UserDao(database);
         evaluations = new EvaluationDao(database);
         goals = new GoalDao(database);
@@ -86,6 +95,41 @@ public final class ApexInsightService {
         } catch (SQLException exception) {
             throw new AppException("Could not load the review history.", exception);
         }
+    }
+
+    public ManagerInsights getManagerInsights(User viewer) throws AppException {
+        requireManager(viewer);
+        return getManagerInsights(viewer, getAllEvaluations(viewer), getGoals(viewer));
+    }
+
+    public ManagerInsights getManagerInsights(User viewer, List<Evaluation> reviews, List<Goal> allGoals)
+            throws AppException {
+        requireManager(viewer);
+        LocalDate today = LocalDate.now(clock);
+        LocalDate recentStart = today.minusDays(29);
+        LocalDate previousStart = today.minusDays(59);
+        List<Evaluation> recentReviews = reviews.stream()
+                .filter(review -> {
+                    LocalDate reviewDate = review.createdAt().toLocalDate();
+                    return !reviewDate.isBefore(recentStart) && !reviewDate.isAfter(today);
+                })
+                .toList();
+        List<Evaluation> previousReviews = reviews.stream()
+                .filter(review -> {
+                    LocalDate reviewDate = review.createdAt().toLocalDate();
+                    return !reviewDate.isBefore(previousStart) && reviewDate.isBefore(recentStart);
+                })
+                .toList();
+        var recentAverage = recentReviews.stream().mapToInt(Evaluation::rating).average();
+        var previousAverage = previousReviews.stream().mapToInt(Evaluation::rating).average();
+        int atRiskOrOverdueGoals = (int) allGoals.stream()
+                .filter(goal -> "At risk".equals(goal.status())
+                        || (!"Completed".equals(goal.status()) && goal.progress() < 100
+                        && goal.dueDate().isBefore(today)))
+                .count();
+        return new ManagerInsights(recentAverage.isPresent() ? recentAverage.getAsDouble() : null,
+                recentReviews.size(), previousAverage.isPresent() ? previousAverage.getAsDouble() : null,
+                previousReviews.size(), atRiskOrOverdueGoals);
     }
 
     public void updateEvaluation(User actor, int evaluationId, int employeeId, int rating, String feedback)

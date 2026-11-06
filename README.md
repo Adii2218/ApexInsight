@@ -44,7 +44,7 @@ On first start, ApexInsight creates demo accounts with salted PBKDF2 password ha
 
 ## Desktop application features
 
-**Manager:** performance overview; search and filter review history; create, edit, and delete dated reviews; assign, search, edit, and delete goals; track a due date, status, and 0–100% progress; create and update employee profiles; reset employee passwords; and export visible report tables to CSV.
+**Manager:** performance overview with recent-versus-prior 30-day review ratings and at-risk or overdue goal counts; search and filter review history; create, edit, and delete dated reviews; assign, search, edit, and delete goals; track a due date, status, and 0–100% progress; create and update employee profiles; reset employee passwords; and export visible report tables to CSV.
 
 **Employee:** a private dashboard; a searchable, read-only feedback history; personal review and goal CSV exports; goal progress updates (completion automatically sets the goal to Completed); and a password-change screen that verifies the current password.
 
@@ -52,7 +52,7 @@ Sign-in, password hashing, database reads/writes, and file exports run in backgr
 
 ## Browser portal and Servlets
 
-The embedded Jetty server uses Jakarta Servlet 5.0 APIs. It serves a responsive, accessible HTML/CSS/JavaScript interface and a JSON servlet API for sign-in, employees, reviews, goals, progress updates, password changes, and sign-out. The desktop and browser interfaces use the same validated service, role checks, DAO classes, and SQLite records.
+The embedded Jetty server uses Jakarta Servlet 5.0 APIs. It serves a responsive, accessible HTML/CSS/JavaScript interface and a JSON servlet API for sign-in, employees, reviews, goals, manager-only review and goal insights, progress updates, password changes, and sign-out. The desktop and browser interfaces use the same validated service, role checks, DAO classes, and SQLite records.
 
 The server deliberately **binds only to `127.0.0.1`**, not the public network. Its port defaults to `8085`; change it when starting with:
 
@@ -111,4 +111,4 @@ src/test/java/com/apexinsight/ service, database migration, concurrency, and web
 .\mvnw.cmd test
 ```
 
-JUnit 5 and a temporary SQLite file test both role sign-ins, employee privacy, manager authorization, review create/edit/delete, goal creation/editing/progress, account and password management, invalid input, sample-account migration without lost review history, concurrent database writes, servlet login and sessions, request protection, and the employee/manager JSON API.
+JUnit 5 and a temporary SQLite file test both role sign-ins, employee privacy, manager authorization, review create/edit/delete, goal creation/editing/progress, manager insight date windows and overdue counts, empty-period behavior, account and password management, invalid input, sample-account migration without lost review history, concurrent database writes, servlet login and sessions, request protection, and the employee/manager JSON API.

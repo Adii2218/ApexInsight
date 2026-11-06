@@ -55,6 +55,7 @@ class WebPortalServerTest {
         assertTrue(page.body().contains("ApexInsight"));
         assertEquals(200, send(manager, "GET", "/assets/app.js", null, true).statusCode());
         assertEquals(401, send(manager, "GET", "/api/me", null, true).statusCode());
+        assertEquals(401, send(manager, "GET", "/api/insights", null, true).statusCode());
         assertEquals(403, send(manager, "POST", "/api/login", "{}", false).statusCode());
 
         HttpResponse<String> managerSignIn = login(manager, "manager", "manager123");
@@ -73,6 +74,10 @@ class WebPortalServerTest {
                 """.formatted(aryanId), true).statusCode());
         JsonNode managerReviews = JSON.readTree(send(manager, "GET", "/api/reviews", null, true).body());
         assertEquals(1, managerReviews.size());
+        JsonNode managerInsights = JSON.readTree(send(manager, "GET", "/api/insights", null, true).body());
+        assertEquals(1, managerInsights.get("recentReviewCount").intValue());
+        assertEquals(5.0, managerInsights.get("recentAverageRating").doubleValue(), 0.001);
+        assertTrue(managerInsights.get("previousAverageRating").isNull());
         int reviewId = managerReviews.get(0).get("id").intValue();
         assertEquals(400, send(manager, "POST", "/api/reviews", "{ invalid", true).statusCode());
 
@@ -88,6 +93,7 @@ class WebPortalServerTest {
         assertEquals(200, login(aryan, "aryan", "aryan123").statusCode());
         assertEquals(1, JSON.readTree(send(aryan, "GET", "/api/reviews", null, true).body()).size());
         assertEquals(403, send(aryan, "GET", "/api/employees", null, true).statusCode());
+        assertEquals(403, send(aryan, "GET", "/api/insights", null, true).statusCode());
         JsonNode tamperedReviews = JSON.readTree(send(aryan, "GET", "/api/reviews?employeeId="
                 + shikhaId, null, true).body());
         for (JsonNode review : tamperedReviews) {
